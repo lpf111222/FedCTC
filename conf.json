@@ -1,0 +1,33 @@
+{
+	"model_name" : "resnet18",
+
+	"dataset_name" : "cifar100",
+
+	"num_client" : 100,
+
+	"k" : 20,
+
+	"global_epochs" : 2000,
+
+	"batch_size" : 50,
+
+	"local_epochs" : 5,
+
+	"optimizer" : "Adagrad",
+
+	"lr" : 1e-3,
+
+	"data_distribution" : "Dirichlet",
+
+	"longtail_exp" : 0.99,
+
+	"dirichlet_alpha_min" : 0.0,
+
+	"dirichlet_alpha_max" : 0.5,
+
+	"lable_smooth_p" : 0.99,
+
+	"mixup_alpha" : 0.2,
+
+	"lp" : 1e-4
+}
