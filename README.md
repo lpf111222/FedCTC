@@ -29,11 +29,11 @@ All hyperparameters are written to file conf.json, which can be rewritten to run
 
 (6) batch_size：the batch_size of the client training. In the experiments of this paper, this parameter was set to 50.
 
-(7) local_epochs：the total number of clients local data training epochs for each client training. In the experiments of this paper, this parameter was set to 50.
+(7) local_epochs：the total number of clients local data training epochs for each client training. In the experiments of this paper, this parameter was set to 5.
 
 (8) optimizer:  the optimizer used for training the model on the clients,  "SGD" is original SGD optimizer, "Adagrad"  is the adaptive AdaGrad optimizer.
 
-(9) lr : the learning rate for clients training. In the experiments of this paper, this parameter was set to 0.001.
+(9) lr : the learning rate for clients training. In the experiments of this paper, this parameter was set to 0.01.
 
 (10) data_distribution："LongTail" means that the distribution of data classes follows a long-tail distribution; "Dirichlet" means that the client data classes are Dirichlet distributed to sample; "IID" stands for all client data being IID(independently and identically distributed).
 
