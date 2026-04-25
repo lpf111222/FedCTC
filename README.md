@@ -13,12 +13,10 @@ The paper studies how to improve federated learning under label skew from the pe
 These methods are used to suppress client drift and overconfident predictions caused by skewed local label distributions. The experiments show that calibrated federated training can achieve higher global test accuracy, lower calibration error, better failure prediction, and stronger OOD detection.
 
 The paper is currently under review and has entered the first round of major revision. In this revision, we further expand the experiments by adding:
-
 - a Vision Transformer variant (CCT) in addition to ResNet-18,
 - IID and mild Dirichlet settings in addition to the original stronger skew settings,
 - and a real-world medical dataset CAMELYON17-WILDS with naturally heterogeneous hospital clients.
 
---------------------------------------------------
 
 ## 1. Installation
 
@@ -30,7 +28,6 @@ The requirements.txt file lists the main libraries needed for running the code.
 
 In practice, the version requirements are not very strict: as long as these libraries are installed in a reasonably compatible Python/PyTorch environment, the code should run normally.
 
---------------------------------------------------
 
 ## 2. Supported datasets
 
@@ -56,7 +53,6 @@ fnyv
 
 After downloading, please place the dataset under: ./data/
 
---------------------------------------------------
 
 ## 3. How to run
 
@@ -65,11 +61,11 @@ You can directly execute the corresponding file for the method you want.
 
 Examples:
 
-python FL_FedAvg.py -c ./conf.json
-python FL_FedCL_LogitNorm.py -c ./conf.json
-python FL_FedCL_LabelSmooth.py -c ./conf.json
-python FL_FedCL_MixUp.py -c ./conf.json
-python FL_FedCL_3In1.py -c ./conf.json
+- python FL_FedAvg.py -c ./conf.json
+- python FL_FedCL_LogitNorm.py -c ./conf.json
+- python FL_FedCL_LabelSmooth.py -c ./conf.json
+- python FL_FedCL_MixUp.py -c ./conf.json
+- python FL_FedCL_3In1.py -c ./conf.json
 
 Where:
 
@@ -79,7 +75,6 @@ Where:
 - FL_FedCL_MixUp.py : federated training with Mixup
 - FL_FedCL_3In1.py : combination of all three calibration strategies
 
---------------------------------------------------
 
 ## 4.Code structure
 
@@ -100,7 +95,6 @@ Main files include:
 
 Each calibration method only modifies the necessary part of the standard FL training pipeline, so the framework is easy to extend.
 
---------------------------------------------------
 
 ## 5.Hyperparameter settings
 
@@ -178,7 +172,6 @@ when using CAMELYON17-WILDS, the number of FL clients must be 3, because the rev
 - lp
   Weight of the Lp Norm regularization term.
 
---------------------------------------------------
 
 ## 6.Experimental notes
 
@@ -199,12 +192,10 @@ The revised experiments additionally include:
 - CAMELYON17-WILDS
 
 For CAMELYON17-WILDS, the setup is different from CIFAR:
-
 - it is a binary classification medical dataset,
 - the clients are natural hospitals/centers,
 - and the total number of clients is fixed to 3.
 
---------------------------------------------------
 
 ## 7.Remarks
 
