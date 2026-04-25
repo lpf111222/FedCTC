@@ -15,7 +15,7 @@ def set_ramdom_seed(seed=2025):
     return None
 
 def roc_curve(y_true, y_scores):
-    # The data type of the input data
+    # The data type of the input  data
     y_true = np.array(y_true, dtype=np.bool)
     y_score = np.array(y_scores, dtype=np.float64)
     # index
