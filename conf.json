@@ -3,15 +3,15 @@
 
 	"dataset_name" : "cifar100",
 
-	"num_client" : 10000,
+	"num_client" : 100,
 
-	"k" : 1,
+	"k" : 10,
 
-	"global_epochs" : 1,
+	"global_epochs" : 2000,
 
 	"batch_size" : 100,
 
-	"local_epochs" : 1,
+	"local_epochs" : 5,
 
 	"optimizer" : "Adagrad",
 
