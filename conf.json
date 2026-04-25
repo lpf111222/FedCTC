@@ -5,7 +5,7 @@
 
 	"num_client" : 100,
 
-	"k" : 20,
+	"k" : 10,
 
 	"global_epochs" : 2000,
 
@@ -19,7 +19,7 @@
 
 	"data_distribution" : "Dirichlet",
 
-	"longtail_exp" : 0.99,
+	"longtail_exp" : 0.7,
 
 	"dirichlet_alpha_min" : 0.0,
 
@@ -29,5 +29,7 @@
 
 	"mixup_alpha" : 0.2,
 
-	"lp" : 1e-4
+	"lp" : 1e-4,
+
+	"ramdom_seed" : 2025
 }

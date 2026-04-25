@@ -2,21 +2,31 @@ from torchvision import datasets, transforms
 import numpy as np
 import random
 import torch
+import os
+import glob
+from torch.utils.data import Dataset, DataLoader
+import pandas as pd
+import numpy as np
+from PIL import Image
+import io
 
 def get_dataset(dir, conf):
     # Generate client data
-    if conf["dataset_name"] == 'mnist':
-        # train
-        train_dataset = datasets.MNIST(dir, train=True, download=True, transform=transforms.ToTensor())
-        # test
-        eval_dataset = datasets.MNIST(dir, train=False, transform=transforms.ToTensor())
-    elif conf["dataset_name"] == 'cifar10':
+    if conf["dataset_name"] == 'cifar10':
         transform_train = transforms.Compose([
             transforms.RandomCrop(32, padding=4),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
         ])
+        # transform_train = transforms.Compose([
+        #     transforms.RandomCrop(32, padding=4),
+        #     transforms.RandomHorizontalFlip(),
+        #     transforms.RandAugment(),
+        #     transforms.ToTensor(),
+        #     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+        #     transforms.RandomErasing(p=0.25),
+        # ])
         transform_test = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
@@ -26,11 +36,19 @@ def get_dataset(dir, conf):
         # test
         eval_dataset = datasets.CIFAR10(dir, train=False, transform=transform_test)
     elif conf["dataset_name"] == 'cifar100':
+        # transform_train = transforms.Compose([
+        #     transforms.RandomCrop(32, padding=4),
+        #     transforms.RandomHorizontalFlip(),
+        #     transforms.ToTensor(),
+        #     transforms.Normalize((0.5071, 0.4865, 0.4409), (0.2673, 0.2564, 0.2762)),
+        # ])
         transform_train = transforms.Compose([
             transforms.RandomCrop(32, padding=4),
             transforms.RandomHorizontalFlip(),
+            transforms.RandAugment(),
             transforms.ToTensor(),
             transforms.Normalize((0.5071, 0.4865, 0.4409), (0.2673, 0.2564, 0.2762)),
+            transforms.RandomErasing(p=0.25),
         ])
         transform_test = transforms.Compose([
             transforms.ToTensor(),
@@ -40,6 +58,31 @@ def get_dataset(dir, conf):
         train_dataset = datasets.CIFAR100(dir, train=True, download=True,transform=transform_train)
         # test
         eval_dataset = datasets.CIFAR100(dir, train=False, transform=transform_test)
+    elif conf["dataset_name"] == 'CAMELYON17-WILDS':
+        transform_train = transforms.Compose([
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomVerticalFlip(),
+            transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.02),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406],
+                                 [0.229, 0.224, 0.225])
+        ])
+        transform_test = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406],
+                                 [0.229, 0.224, 0.225])
+        ])
+        # train
+        train_dataset = Camelyon17WildsDataset(dir = dir, prefix="train", target_centers=[0, 3, 4], transform=transform_train)
+        # test
+        eval_dataset = Camelyon17WildsDataset(dir = dir, prefix="test", target_centers=[2], transform=transform_test)
+        clients_distribution = train_dataset.clients_distribution
+        train_clients_index = train_dataset.clients_index
+        eval_clients_index = {}
+        eval_clients_index[0] = eval_dataset.clients_index[0]
+        eval_clients_index[1] = eval_dataset.clients_index[0]
+        eval_clients_index[2] = eval_dataset.clients_index[0]
+        return train_dataset, eval_dataset, clients_distribution, train_clients_index, eval_clients_index
     else:
         print("Wrong dataset name.")
 
@@ -165,3 +208,60 @@ def client_noniid_LongTail(train_dataset, eval_dataset, conf):
             if len(all_data_list) > 0:
                 indexs.append(all_data_list.pop())
     return clients_distribution, train_clients_index, eval_clients_index
+
+class Camelyon17WildsDataset(Dataset):
+    def __init__(self, dir, prefix, target_centers=None, transform=None):
+        # dir: Directory where the file is located; prefix: File prefix, such as "train", "val", "test"; transform: Image transformation
+        self.transform = transform
+        dir = dir+'CAMELYON17-WILDS'
+        pattern = os.path.join(dir, f"{prefix}-*.parquet")
+        files = sorted(glob.glob(pattern))
+        if len(files) == 0:
+            raise FileNotFoundError(f"No matching Parquet file was found: {pattern}")
+        print(f"loading {len(files)} {prefix} parquet file...")
+        dfs = [pd.read_parquet(f) for f in files]
+        df = pd.concat(dfs, ignore_index=True)
+        # Perform data filtering based on the input list of target_centers.
+        if target_centers is not None:
+            if isinstance(target_centers, (int, str)):
+                target_centers = [target_centers]
+            df = df[df["center"].isin(target_centers)]
+            print(f"-> Filtering the data of Centers {target_centers}: There are {len(df)} remaining samples.")
+        else:
+            print(f"-> Total {prefix} sample count: {len(df)}")
+        # Reset the index. Make sure that the index of the Dataset starts from 0 and is consecutive.
+        self.df = df.reset_index(drop=True)
+        # Build the central index dictionary and the label proportion dictionary
+        self.clients_index = {}
+        self.clients_distribution = {}
+        key = 0
+        for center_val in self.df["center"].unique():
+            idx_list = self.df[self.df["center"] == center_val].index.tolist()
+            self.clients_index[key] = idx_list
+            center_df = self.df[self.df["center"] == center_val]
+            total_samples = len(center_df)
+            count_0 = (center_df["label"] == 0).sum()
+            count_1 = (center_df["label"] == 1).sum()
+            ratio_0 = count_0 / total_samples if total_samples > 0 else 0.0
+            ratio_1 = count_1 / total_samples if total_samples > 0 else 0.0
+            self.clients_distribution[key] = np.array([ratio_0, ratio_1])
+            key += 1
+        return None
+
+    def __len__(self):
+        return len(self.df)
+
+    def __getitem__(self, idx):
+        row = self.df.iloc[idx]
+        img_data = row["image"]
+        if isinstance(img_data, dict):
+            img_bytes = img_data["bytes"]
+        elif isinstance(img_data, bytes):
+            img_bytes = img_data
+        else:
+            raise ValueError(f"Unrecognizable image format: {type(img_data)}")
+        img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+        label = int(row["label"])
+        if self.transform:
+            img = self.transform(img)
+        return img, label

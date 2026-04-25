@@ -11,7 +11,7 @@ import os
 import model, server_base, client_base, util, dataset_division
 
 
-class FedCL_LabelSmooth_Client(client_base.ClientBase):
+class FedProx_Client(client_base.ClientBase):
     def __init__(self, global_model, conf, train_dataset, eval_dataset, data_distribution, train_index, eval_index, id):
         super().__init__(conf, train_dataset, eval_dataset, data_distribution, train_index, eval_index, id)
         # Create client local model
@@ -39,14 +39,13 @@ class FedCL_LabelSmooth_Client(client_base.ClientBase):
                 target = batch[1].to(self.device)
                 optimizer.zero_grad()
                 logits = self.local_model(data)
-                # log_softmax
-                log_softmax_outputs = F.log_softmax(logits, dim=1)
-                # lable smooth
-                target_smooth = torch.zeros_like(log_softmax_outputs).fill_(
-                    (1 - self.conf["lable_smooth_p"]) / (self.local_model.num_classes - 1)
-                    ).scatter(1, target.unsqueeze(1), self.conf["lable_smooth_p"]).detach()
-                # loss
-                loss = -torch.sum(target_smooth * log_softmax_outputs, dim=1).mean()
+                loss = F.cross_entropy(logits, target, reduction='mean')
+                ############ FedProx参数的变化量做为loss
+                proximal_term = 0.0
+                for name, param in self.local_model.named_parameters():
+                    proximal_term += ((param - old_model_parameters[name]).norm(2) ** 2) * 0.5 * 0.001
+                loss += proximal_term
+                ############
                 loss.backward()
                 optimizer.step()
                 train_error_loss += loss.item() * len(target)
@@ -60,21 +59,20 @@ class FedCL_LabelSmooth_Client(client_base.ClientBase):
         return trained_model_parameters, self.train_data_quantity, train_error_loss, train_complexity_loss
 
 
-class FedCL_LabelSmooth_Server(server_base.ServerBase):
+class FedProx_Server(server_base.ServerBase):
     def __init__(self, conf, train_dataset, eval_dataset, clients_distribution, train_clients_index, eval_clients_index):
         super().__init__(conf, eval_dataset)
-        self.server_name = 'FedCL_LabelSmooth'
+        self.server_name = 'FedProx'
         # Create a server model
         self.global_model = model.get_model(conf)
         # The client is  a member of the server
         self.clients = []
         for i in range(conf["num_client"]):
             self.clients.append(
-                FedCL_LabelSmooth_Client(self.global_model, conf, train_dataset, eval_dataset, clients_distribution[i],
+                FedProx_Client(self.global_model, conf, train_dataset, eval_dataset, clients_distribution[i],
                              train_clients_index[i],
                              eval_clients_index[i], i))
         return None
-
 
 if __name__ == '__main__':
     # Read the hyperparameters stored in conf.json
@@ -96,6 +94,6 @@ if __name__ == '__main__':
     print('Dateset is OK.')
 
     # Create FL server, train, and evaluate
-    FedCL_LabelSmooth = FedCL_LabelSmooth_Server(conf, train_dataset, eval_dataset, clients_distribution, train_clients_index, eval_clients_index)
-    FedCL_LabelSmooth.global_train()
-    FedCL_LabelSmooth.global_model_get_all_metrics()
+    FedProx = FedProx_Server(conf, train_dataset, eval_dataset, clients_distribution, train_clients_index, eval_clients_index)
+    FedProx.global_train()
+    FedProx.global_model_get_all_metrics()

@@ -11,7 +11,8 @@ import os
 import model, server_base, client_base, util, dataset_division
 
 
-class FedCL_LabelSmooth_Client(client_base.ClientBase):
+
+class FedLC_Client(client_base.ClientBase):
     def __init__(self, global_model, conf, train_dataset, eval_dataset, data_distribution, train_index, eval_index, id):
         super().__init__(conf, train_dataset, eval_dataset, data_distribution, train_index, eval_index, id)
         # Create client local model
@@ -29,6 +30,16 @@ class FedCL_LabelSmooth_Client(client_base.ClientBase):
             optimizer = torch.optim.Adagrad(self.local_model.parameters(), lr=self.conf["lr"])
         else:
             print('This experiment does not include any other optimizer.')
+        # ===== FedLC added lines begin =====
+        # Convert local label ratio distribution to local class counts
+        class_count = torch.as_tensor((self.data_distribution * self.train_data_quantity).astype('int'), dtype=torch.float32, device=self.device)
+        # Handle missing classes: avoid 0^(-1/4)
+        class_count = torch.clamp(class_count, min=1.0)
+        # FedLC hyperparameter
+        tau = self.conf["fedlc_tau"] if "fedlc_tau" in self.conf else 1.0
+        # Per-class calibration term
+        logit_calibration = tau * torch.pow(class_count, -0.25)
+        # ===== FedLC added lines end =====
         # Local training epochs
         train_error_loss = 0.0
         for e in range(self.conf["local_epochs"]):
@@ -39,14 +50,9 @@ class FedCL_LabelSmooth_Client(client_base.ClientBase):
                 target = batch[1].to(self.device)
                 optimizer.zero_grad()
                 logits = self.local_model(data)
-                # log_softmax
-                log_softmax_outputs = F.log_softmax(logits, dim=1)
-                # lable smooth
-                target_smooth = torch.zeros_like(log_softmax_outputs).fill_(
-                    (1 - self.conf["lable_smooth_p"]) / (self.local_model.num_classes - 1)
-                    ).scatter(1, target.unsqueeze(1), self.conf["lable_smooth_p"]).detach()
-                # loss
-                loss = -torch.sum(target_smooth * log_softmax_outputs, dim=1).mean()
+                # FedLC
+                calibrated_logits = logits - logit_calibration
+                loss = F.cross_entropy(calibrated_logits, target, reduction='mean')
                 loss.backward()
                 optimizer.step()
                 train_error_loss += loss.item() * len(target)
@@ -60,17 +66,17 @@ class FedCL_LabelSmooth_Client(client_base.ClientBase):
         return trained_model_parameters, self.train_data_quantity, train_error_loss, train_complexity_loss
 
 
-class FedCL_LabelSmooth_Server(server_base.ServerBase):
+class FedLC_Server(server_base.ServerBase):
     def __init__(self, conf, train_dataset, eval_dataset, clients_distribution, train_clients_index, eval_clients_index):
         super().__init__(conf, eval_dataset)
-        self.server_name = 'FedCL_LabelSmooth'
+        self.server_name = 'FedLC'
         # Create a server model
         self.global_model = model.get_model(conf)
         # The client is  a member of the server
         self.clients = []
         for i in range(conf["num_client"]):
             self.clients.append(
-                FedCL_LabelSmooth_Client(self.global_model, conf, train_dataset, eval_dataset, clients_distribution[i],
+                FedLC_Client(self.global_model, conf, train_dataset, eval_dataset, clients_distribution[i],
                              train_clients_index[i],
                              eval_clients_index[i], i))
         return None
@@ -96,6 +102,6 @@ if __name__ == '__main__':
     print('Dateset is OK.')
 
     # Create FL server, train, and evaluate
-    FedCL_LabelSmooth = FedCL_LabelSmooth_Server(conf, train_dataset, eval_dataset, clients_distribution, train_clients_index, eval_clients_index)
-    FedCL_LabelSmooth.global_train()
-    FedCL_LabelSmooth.global_model_get_all_metrics()
+    FedLC = FedLC_Server(conf, train_dataset, eval_dataset, clients_distribution, train_clients_index, eval_clients_index)
+    FedLC.global_train()
+    FedLC.global_model_get_all_metrics()

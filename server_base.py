@@ -23,7 +23,9 @@ class ServerBase(object):
         # eval dataset
         self.eval_dataset = eval_dataset
         self.eval_data_loader = torch.utils.data.DataLoader(eval_dataset, batch_size=self.conf["batch_size"], shuffle=False)
-        self.eval_data_quantity = len(eval_dataset.targets)
+        # self.eval_data_loader = torch.utils.data.DataLoader(eval_dataset, batch_size=self.conf["batch_size"], sampler=torch.utils.data.sampler.SubsetRandomSampler(list(range(1, 501))))
+        self.eval_data_quantity = len(self.eval_dataset)
+        # self.eval_data_quantity = 500
         # The training and testing information was recorded and saved as excel after completing the training
         self.train_eval_records = pd.DataFrame(index=list(range(self.conf['global_epochs'])),
                                                columns=['train_error_loss',
@@ -34,7 +36,7 @@ class ServerBase(object):
         return None
 
     def global_train(self):
-        for e in range(self.conf['global_epochs']):
+        for e in range(self.conf['global_epochs'] + 1):
             # set ramdom seed
             util.set_ramdom_seed(seed=e)
             # broadcast, train, upload
@@ -45,14 +47,14 @@ class ServerBase(object):
             self.global_model.load_state_dict(new_model_parameters)
             # Testing of the server global model and the client personalized model.
             # It is computationally expensive and takes place only once in every N epochs. The figure in the paper is N=10
-            if e%10==0:  # if e%10==0:
+            if e%10==0:
                 self.global_model_eval()
             # Finish
             self.global_epoch += 1
             # Save model parameters
-            model_parameters = self.global_model.state_dict()
-            torch.save(model_parameters, 'result/' + self.server_name + '_params.pt')
-            print("Save model！")
+            # model_parameters = self.global_model.state_dict()
+            # torch.save(model_parameters, 'result/' + self.server_name + '_params.pt')
+            # print("Save model！")
         return None
 
     def broadcast_train_upload(self):
@@ -509,10 +511,10 @@ class ServerBase(object):
             transforms.Normalize([0.4377, 0.4438, 0.4728], [0.1980, 0.2010, 0.1970])
         ])
         # test set as OOD
-        self.ood_dataset = SVHN(root='data/SVHN', split='test', download=True, transform=transform)
+        self.ood_dataset = SVHN(root='./data/SVHN', split='test', download=True, transform=transform)
         # OOD DataLoader
         self.ood_loader = torch.utils.data.DataLoader(self.ood_dataset, batch_size=1, shuffle=False)
-        self.ood_data_quantity = len(self.ood_loader)
+        self.ood_data_quantity = len(self.ood_dataset)
         # The data that the global_model_get_all_metrics() needs to store
         self.ind_records = pd.DataFrame(index=list(range(self.ind_data_quantity)),
                                                      columns=['lable_P',

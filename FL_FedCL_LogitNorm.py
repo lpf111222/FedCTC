@@ -1,9 +1,15 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import pandas as pd
+import numpy as np
 import copy
 import random
-import model, server_base, client_base
+import argparse
+import json
+import os
+import model, server_base, client_base, util, dataset_division
+
 
 class FedCL_LogitNorm_Client(client_base.ClientBase):
     def __init__(self, global_model, conf, train_dataset, eval_dataset, data_distribution, train_index, eval_index, id):
@@ -37,7 +43,8 @@ class FedCL_LogitNorm_Client(client_base.ClientBase):
                 logits = self.local_model(data)
                 error_loss = F.cross_entropy(logits, target, reduction='mean')
                 # Logit norm
-                complexity_loss = logits.abs().sum() * self.conf["lp"]
+                complexity_loss = logits.norm(1) * self.conf["lp"]
+                # complexity_loss = (logits.norm(2) ** 2) * self.conf["lp"]
                 loss = error_loss + complexity_loss
                 loss.backward()
                 optimizer.step()
@@ -67,3 +74,28 @@ class FedCL_LogitNorm_Server(server_base.ServerBase):
                              train_clients_index[i],
                              eval_clients_index[i], i))
         return None
+
+
+if __name__ == '__main__':
+    # Read the hyperparameters stored in conf.json
+    parser = argparse.ArgumentParser(description='Federated Learning')
+    parser.add_argument('-c', '--conf', dest='conf')
+    args = parser.parse_args()
+    with open(args.conf, 'r') as f:
+        conf = json.load(f)
+    print('hyperparameters are: ',conf)
+
+    # Set the random seed
+    util.set_ramdom_seed(conf["ramdom_seed"])
+
+    # Use GPU
+    os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+
+    # read dateset
+    train_dataset, eval_dataset, clients_distribution, train_clients_index, eval_clients_index = dataset_division.get_dataset('./data/', conf)
+    print('Dateset is OK.')
+
+    # Create FL server, train, and evaluate
+    FedCL_LogitNorm = FedCL_LogitNorm_Server(conf, train_dataset, eval_dataset, clients_distribution, train_clients_index, eval_clients_index)
+    FedCL_LogitNorm.global_train()
+    FedCL_LogitNorm.global_model_get_all_metrics()

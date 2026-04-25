@@ -1,13 +1,18 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import pandas as pd
+import numpy as np
 import copy
 import random
-import model, server_base, client_base
+import argparse
+import json
+import os
+import model, server_base, client_base, util, dataset_division
 
 
 
-class FedAvgClient(client_base.ClientBase):
+class FedAvg_Client(client_base.ClientBase):
     def __init__(self, global_model, conf, train_dataset, eval_dataset, data_distribution, train_index, eval_index, id):
         super().__init__(conf, train_dataset, eval_dataset, data_distribution, train_index, eval_index, id)
         # Create client local model
@@ -49,7 +54,7 @@ class FedAvgClient(client_base.ClientBase):
         return trained_model_parameters, self.train_data_quantity, train_error_loss, train_complexity_loss
 
 
-class FedAvgServer(server_base.ServerBase):
+class FedAvg_Server(server_base.ServerBase):
     def __init__(self, conf, train_dataset, eval_dataset, clients_distribution, train_clients_index, eval_clients_index):
         super().__init__(conf, eval_dataset)
         self.server_name = 'FedAvg'
@@ -59,7 +64,30 @@ class FedAvgServer(server_base.ServerBase):
         self.clients = []
         for i in range(conf["num_client"]):
             self.clients.append(
-                FedAvgClient(self.global_model, conf, train_dataset, eval_dataset, clients_distribution[i],
-                             train_clients_index[i],
-                             eval_clients_index[i], i))
+                FedAvg_Client(self.global_model, conf, train_dataset, eval_dataset, clients_distribution[i], train_clients_index[i], eval_clients_index[i], i))
         return None
+
+
+if __name__ == '__main__':
+    # Read the hyperparameters stored in conf.json
+    parser = argparse.ArgumentParser(description='Federated Learning')
+    parser.add_argument('-c', '--conf', dest='conf')
+    args = parser.parse_args()
+    with open(args.conf, 'r') as f:
+        conf = json.load(f)
+    print('hyperparameters are: ',conf)
+
+    # Set the random seed
+    util.set_ramdom_seed(conf["ramdom_seed"])
+
+    # Use GPU
+    os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+
+    # read dateset
+    train_dataset, eval_dataset, clients_distribution, train_clients_index, eval_clients_index = dataset_division.get_dataset('./data/', conf)
+    print('Dateset is OK.')
+
+    # Create FL server, train, and evaluate
+    FedAvg = FedAvg_Server(conf, train_dataset, eval_dataset, clients_distribution, train_clients_index, eval_clients_index)
+    FedAvg.global_train()
+    FedAvg.global_model_get_all_metrics()
