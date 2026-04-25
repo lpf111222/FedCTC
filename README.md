@@ -65,11 +65,11 @@ You can directly execute the corresponding file for the method you want.
 
 Examples:
 
-python FL_FedAvg.py
-python FL_FedCL_LogitNorm.py
-python FL_FedCL_LabelSmooth.py
-python FL_FedCL_MixUp.py
-python FL_FedCL_3In1.py
+python FL_FedAvg.py -c ./conf.json
+python FL_FedCL_LogitNorm.py -c ./conf.json
+python FL_FedCL_LabelSmooth.py -c ./conf.json
+python FL_FedCL_MixUp.py -c ./conf.json
+python FL_FedCL_3In1.py -c ./conf.json
 
 Where:
 
