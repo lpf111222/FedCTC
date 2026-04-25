@@ -9,7 +9,7 @@
 
 	"global_epochs" : 2000,
 
-	"batch_size" : 100,
+	"batch_size" : 50,
 
 	"local_epochs" : 5,
 
