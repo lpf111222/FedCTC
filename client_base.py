@@ -52,5 +52,5 @@ class ClientBase(object):
             eval_acc = correct_num / self.eval_data_quantity * 100.0
             eval_loss /= self.eval_data_quantity
             # print
-            print("client %d，finished personalized model test，personalized eval_acc：%f，personalized eval_loss：%f" % (self.client_id, eval_acc, eval_loss))
+            print("client %d，finished personalized model test，personalized eval_acc：%f，personalized eval_loss：%f " % (self.client_id, eval_acc, eval_loss))
         return eval_acc, eval_loss, self.eval_data_quantity
